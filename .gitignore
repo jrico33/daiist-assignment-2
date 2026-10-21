@@ -14,3 +14,9 @@ runs/
 
 # Never commit your API key
 .env
+
+   datasets/
+   runs/
+   /yolo11*.pt
+   
+
