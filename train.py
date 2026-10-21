@@ -1,8 +1,9 @@
+
 """
 Assignment 2: training pipeline (hard-hat compliance on construction sites).
-
+ 
     uv run python main.py train
-
+ 
 Start to finish, no manual steps:
   1. Download the Roboflow Universe dataset version named below.
   2. Describe it (instances per class, split sizes, object sizes).
@@ -12,7 +13,7 @@ Start to finish, no manual steps:
   5. Turn scores into the frame-level decision, sweep the threshold, cost it,
      pick the single threshold and the review band.
   6. Save weights/best.pt and everything app.py needs into artifacts/.
-
+ 
 Environment variables (all optional):
   EPOCHS=40        training epochs
   BATCH=16         batch size (-1 lets Ultralytics pick for your GPU)
@@ -20,21 +21,21 @@ Environment variables (all optional):
   REUSE_WEIGHTS=1  skip training and evaluate the committed weights/best.pt
   LOCAL_DATASET=path  use an already-downloaded YOLO dataset folder
 """
-
+ 
 from __future__ import annotations
-
+ 
 import csv
 import json
 import os
 import shutil
 import time
 from pathlib import Path
-
+ 
 import numpy as np
 import yaml
-
+ 
 import costing
-
+ 
 # --------------------------------------------------------------------------- #
 # Dataset: Roboflow Universe, used as published (not forked).
 # --------------------------------------------------------------------------- #
@@ -42,13 +43,13 @@ WORKSPACE = "computer-vision-filqz"
 PROJECT = "hard-hat-detection-62rrp"
 VERSION = 2
 POSITIVE_CLASS = "head"  # a visible head with no helmet = violation
-
+ 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "datasets"
 WEIGHTS_DIR = ROOT / "weights"
 ART_DIR = ROOT / "artifacts"
 RUNS_DIR = ROOT / "runs"
-
+ 
 EPOCHS = int(os.environ.get("EPOCHS", "40"))
 BATCH = int(os.environ.get("BATCH", "16"))
 IMGSZ = 640
@@ -56,8 +57,8 @@ BASE_MODEL = os.environ.get("MODEL", "yolo11s.pt")
 SEED = 0
 OPERATING_CONF = 0.25  # box confidence used for per-class precision/recall tables
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-
-
+ 
+ 
 # =========================================================================== #
 # 1. Data
 # =========================================================================== #
@@ -66,11 +67,11 @@ def download_dataset() -> Path:
     if local:
         print(f"Using local dataset at {local}")
         return Path(local).resolve()
-
+ 
     from roboflow import Roboflow
-
+ 
     from api_key import load_api_key
-
+ 
     target = DATA_DIR / f"{PROJECT}-{VERSION}"
     if (target / "data.yaml").exists():
         print(f"Dataset already downloaded at {target}")
@@ -79,37 +80,48 @@ def download_dataset() -> Path:
     version = rf.workspace(WORKSPACE).project(PROJECT).version(VERSION)
     ds = version.download("yolov11", location=str(target), overwrite=True)
     return Path(ds.location).resolve()
-
-
+ 
+ 
 def images_in(folder: Path) -> list[Path]:
     if not folder.is_dir():
         return []
     return sorted(p for p in folder.iterdir() if p.suffix.lower() in IMG_EXT)
-
-
+ 
+ 
 def label_for(img: Path) -> Path:
     return img.parent.parent / "labels" / (img.stem + ".txt")
-
-
-def ensure_test_split(ds: Path) -> str:
-    """If the version ships without a test split, carve one out of valid.
-
-    Deterministic: every second validation image (sorted by name) moves to
-    test, so anyone re-running gets the same split.
-    """
-    if images_in(ds / "test" / "images"):
-        return "test split shipped with the dataset version"
-    val_imgs = images_in(ds / "valid" / "images")
-    (ds / "test" / "images").mkdir(parents=True, exist_ok=True)
-    (ds / "test" / "labels").mkdir(parents=True, exist_ok=True)
-    for img in val_imgs[1::2]:
+ 
+ 
+def _move(imgs: list[Path], ds: Path, split: str) -> None:
+    (ds / split / "images").mkdir(parents=True, exist_ok=True)
+    (ds / split / "labels").mkdir(parents=True, exist_ok=True)
+    for img in imgs:
         lbl = label_for(img)
-        shutil.move(str(img), ds / "test" / "images" / img.name)
+        shutil.move(str(img), ds / split / "images" / img.name)
         if lbl.exists():
-            shutil.move(str(lbl), ds / "test" / "labels" / lbl.name)
-    return "no test split shipped; every 2nd valid image moved to test (deterministic)"
-
-
+            shutil.move(str(lbl), ds / split / "labels" / lbl.name)
+ 
+ 
+def ensure_splits(ds: Path) -> str:
+    """Make sure train / valid / test all exist, without ever touching an
+    existing test split. Deterministic (sorted by file name), so anyone
+    re-running gets the same split.
+ 
+    - No valid split (this version ships 75/25 train/test): every 7th train
+      image (~15%) moves to valid. Valid is only used for early stopping and
+      picking best.pt, so the test split stays a clean hold-out.
+    - No test split: every 2nd valid image moves to test.
+    """
+    notes = []
+    if not images_in(ds / "valid" / "images"):
+        _move(images_in(ds / "train" / "images")[::7], ds, "valid")
+        notes.append("no valid split shipped; every 7th train image (~15%) moved to valid")
+    if not images_in(ds / "test" / "images"):
+        _move(images_in(ds / "valid" / "images")[1::2], ds, "test")
+        notes.append("no test split shipped; every 2nd valid image moved to test")
+    return "; ".join(notes) or "train/valid/test all shipped with the dataset version"
+ 
+ 
 def write_data_yaml(ds: Path) -> tuple[Path, list[str]]:
     with open(ds / "data.yaml") as f:
         cfg = yaml.safe_load(f)
@@ -128,8 +140,8 @@ def write_data_yaml(ds: Path) -> tuple[Path, list[str]]:
     with open(out, "w") as f:
         yaml.safe_dump(fixed, f)
     return out, list(names)
-
-
+ 
+ 
 def read_labels(img: Path) -> np.ndarray:
     """Ground truth as [cls, x1, y1, x2, y2] in normalised coordinates."""
     lbl = label_for(img)
@@ -148,8 +160,8 @@ def read_labels(img: Path) -> np.ndarray:
                 xs, ys = vals[0::2], vals[1::2]
                 rows.append([c, min(xs), min(ys), max(xs), max(ys)])
     return np.array(rows, dtype=float).reshape(-1, 5)
-
-
+ 
+ 
 def describe_dataset(ds: Path, names: list[str], split_note: str) -> dict:
     stats = {"split_note": split_note, "splits": {}}
     for split in ("train", "valid", "test"):
@@ -195,14 +207,14 @@ def describe_dataset(ds: Path, names: list[str], split_note: str) -> dict:
         test["images_containing"].get(POSITIVE_CLASS, 0) / max(test["images"], 1), 3
     )
     return stats
-
-
+ 
+ 
 # =========================================================================== #
 # 2. Training
 # =========================================================================== #
 def finetune(data_yaml: Path) -> tuple[Path, dict]:
     from ultralytics import YOLO
-
+ 
     WEIGHTS_DIR.mkdir(exist_ok=True)
     final = WEIGHTS_DIR / "best.pt"
     settings = {
@@ -212,9 +224,9 @@ def finetune(data_yaml: Path) -> tuple[Path, dict]:
     if os.environ.get("REUSE_WEIGHTS") == "1" and final.exists():
         print(f"REUSE_WEIGHTS=1: skipping training, using {final}")
         return final, {**settings, "note": "reused committed weights"}
-
+ 
     import torch
-
+ 
     device = 0 if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
     settings["device"] = str(torch.cuda.get_device_name(0) if device == 0 else device)
     print(f"Training {BASE_MODEL} for {EPOCHS} epochs on {settings['device']}")
@@ -231,8 +243,8 @@ def finetune(data_yaml: Path) -> tuple[Path, dict]:
     settings["run_dir"] = str(Path(model.trainer.save_dir).relative_to(ROOT))
     print(f"Saved {final}")
     return final, settings
-
-
+ 
+ 
 # =========================================================================== #
 # 3. Evaluation (one evaluator for all three models, so the comparison is fair)
 # =========================================================================== #
@@ -254,8 +266,8 @@ def predict(model, imgs: list[Path], class_map: dict[int, int]) -> list[np.ndarr
         arr = np.column_stack([mapped, conf, xyxy])[keep]
         out.append(arr.reshape(-1, 6))
     return out
-
-
+ 
+ 
 def iou(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """IoU matrix between boxes a [N,4] and b [M,4] in xyxy."""
     if len(a) == 0 or len(b) == 0:
@@ -268,11 +280,11 @@ def iou(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     area_a = (a[:, 2] - a[:, 0]) * (a[:, 3] - a[:, 1])
     area_b = (b[:, 2] - b[:, 0]) * (b[:, 3] - b[:, 1])
     return inter / (area_a[:, None] + area_b[None, :] - inter + 1e-9)
-
-
+ 
+ 
 IOU_THRS = np.linspace(0.5, 0.95, 10)
-
-
+ 
+ 
 def average_precision(recall: np.ndarray, precision: np.ndarray) -> float:
     r = np.concatenate([[0.0], recall, [1.0]])
     p = np.concatenate([[1.0], precision, [0.0]])
@@ -280,8 +292,8 @@ def average_precision(recall: np.ndarray, precision: np.ndarray) -> float:
     x = np.linspace(0, 1, 101)  # COCO 101-point interpolation
     trapz = getattr(np, "trapezoid", None) or np.trapz
     return float(trapz(np.interp(x, r, p), x))
-
-
+ 
+ 
 def detection_metrics(preds: list[np.ndarray], gts: list[np.ndarray], names: list[str]) -> dict:
     per_class = {}
     for c, name in enumerate(names):
@@ -337,8 +349,8 @@ def detection_metrics(preds: list[np.ndarray], gts: list[np.ndarray], names: lis
         "mAP50_95": round(float(np.mean([v["AP50_95"] for v in valid])), 4) if valid else 0.0,
     }
     return {"per_class": per_class, "overall": overall, "box_conf_for_P_R": OPERATING_CONF}
-
-
+ 
+ 
 def class_confusion(preds: list[np.ndarray], gts: list[np.ndarray], names: list[str]) -> dict:
     """Detection confusion matrix at OPERATING_CONF and IoU 0.5.
     Rows = true class (+ 'background' for false boxes), cols = predicted class (+ 'missed')."""
@@ -361,13 +373,13 @@ def class_confusion(preds: list[np.ndarray], gts: list[np.ndarray], names: list[
             m[k, int(p[j, 0])] += 1
     labels = list(names)
     return {"rows_true": labels + ["background"], "cols_pred": labels + ["missed"], "matrix": m.tolist()}
-
-
+ 
+ 
 def frame_scores(preds: list[np.ndarray], pos_id: int) -> np.ndarray:
     """Frame-level violation score = max confidence of a positive-class box."""
     return np.array([p[p[:, 0] == pos_id, 1].max() if np.any(p[:, 0] == pos_id) else 0.0 for p in preds])
-
-
+ 
+ 
 def frame_auc(scores: np.ndarray, labels: np.ndarray) -> float:
     pos, neg = scores[labels == 1], scores[labels == 0]
     if len(pos) == 0 or len(neg) == 0:
@@ -375,8 +387,8 @@ def frame_auc(scores: np.ndarray, labels: np.ndarray) -> float:
     greater = (pos[:, None] > neg[None, :]).mean()
     ties = (pos[:, None] == neg[None, :]).mean()
     return float(greater + 0.5 * ties)
-
-
+ 
+ 
 # =========================================================================== #
 # 4. Costing
 # =========================================================================== #
@@ -399,14 +411,14 @@ def sensitivity(scores, labels) -> dict:
             "base_rate": pi, "best_threshold": s["t_high"], "model_alone_per_1000": round(s["cost_per_1000"], 1),
         })
     return out
-
-
+ 
+ 
 def plot_cost_curve(sweeps: dict, chosen: dict, band: dict, alts: dict, path: Path) -> None:
     import matplotlib
-
+ 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-
+ 
     fig, ax = plt.subplots(figsize=(8, 4.5))
     for name, sw in sweeps.items():
         ax.plot([r["t_high"] for r in sw], [r["cost_per_1000"] for r in sw], label=name)
@@ -425,15 +437,15 @@ def plot_cost_curve(sweeps: dict, chosen: dict, band: dict, alts: dict, path: Pa
     fig.tight_layout()
     fig.savefig(path, dpi=130)
     plt.close(fig)
-
-
+ 
+ 
 # =========================================================================== #
 # 5. Main
 # =========================================================================== #
 def fmt(x):
     return "n/a" if x is None else f"{x:.3f}"
-
-
+ 
+ 
 def write_report_tables(res: dict, path: Path) -> None:
     """Markdown tables to paste into REPORT.md."""
     L = []
@@ -450,7 +462,7 @@ def write_report_tables(res: dict, path: Path) -> None:
         if v:
             L.append(f"| {n} | {v['median_pct_of_image']} | {v['p10_pct']} | {v['p90_pct']} | {v['share_tiny_lt_0.1pct']} |")
     L.append(f"\nSplit note: {ds['split_note']}\n")
-
+ 
     L.append("### Models on the test split\n")
     L.append("| model | mAP50 | mAP50-95 | " + " | ".join(f"AP50 {n}" for n in res["names"]) + " | frame AUC | min cost / 1000 frames |")
     L.append("|---|---|---|" + "---|" * len(res["names"]) + "---|---|")
@@ -459,7 +471,7 @@ def write_report_tables(res: dict, path: Path) -> None:
         L.append(f"| {m} | {d['overall']['mAP50']:.3f} | {d['overall']['mAP50_95']:.3f} | "
                  + " | ".join(fmt(d["per_class"][n]["AP50"]) for n in res["names"])
                  + f" | {v['frame_auc']:.3f} | EUR {v['best_single']['cost_per_1000']:.0f} |")
-
+ 
     L.append(f"\n### Finetuned per-class (box conf >= {OPERATING_CONF}, IoU 0.5)\n")
     L.append("| class | instances | precision | recall | AP50 | AP50-95 |")
     L.append("|---|---|---|---|---|---|")
@@ -471,7 +483,7 @@ def write_report_tables(res: dict, path: Path) -> None:
     L.append("|---|" + "---|" * len(cm["cols_pred"]))
     for r, row in zip(cm["rows_true"], cm["matrix"]):
         L.append(f"| **{r}** | " + " | ".join(str(x) for x in row) + " |")
-
+ 
     c, b, bc = res["chosen_single"], res["band_unconstrained"], res["band_chosen"]
     alt = res["alternatives"]
     a = res["assumptions"]
@@ -484,7 +496,7 @@ def write_report_tables(res: dict, path: Path) -> None:
     for label, r in (("model alone", c), ("model + review (unconstrained)", b), (f"model + review (<= {a['reviewers_available']} reviewer)", bc)):
         L.append(f"| {label} | {r['t_low']:.2f} / {r['t_high']:.2f} | {r['cost_per_1000']:.0f} | {r['cost_per_day']:.0f} | "
                  f"{r['review_share']:.1%} | {r['reviewers_needed']:.2f} | {r['missed_violations_per_day']:.1f} | {r['false_alerts_per_day']:.1f} |")
-
+ 
     L.append("\n### Sensitivity: cost of a missed violation\n")
     L.append("| cost_fn | best threshold | model alone /1000 | do nothing /1000 | human all /1000 |")
     L.append("|---|---|---|---|---|")
@@ -496,40 +508,40 @@ def write_report_tables(res: dict, path: Path) -> None:
     for r in res["sensitivity"]["base_rate"]:
         L.append(f"| {r['base_rate']:.0%} | {r['best_threshold']:.2f} | {r['model_alone_per_1000']} |")
     path.write_text("\n".join(L) + "\n")
-
-
+ 
+ 
 def main() -> None:
     from ultralytics import YOLO
-
+ 
     ART_DIR.mkdir(exist_ok=True)
-
+ 
     # 1. Data
     ds = download_dataset()
-    split_note = ensure_test_split(ds)
+    split_note = ensure_splits(ds)
     data_yaml, names = write_data_yaml(ds)
     if POSITIVE_CLASS not in names:
         raise SystemExit(f"Positive class '{POSITIVE_CLASS}' not in dataset classes {names}")
     pos_id = names.index(POSITIVE_CLASS)
     stats = describe_dataset(ds, names, split_note)
     print(json.dumps(stats, indent=2))
-
+ 
     # 2. Finetune
     weights, train_settings = finetune(data_yaml)
-
+ 
     # 3. Evaluate all models on the same test images
     test_imgs = images_in(ds / "test" / "images")
     gts = [read_labels(p) for p in test_imgs]
     labels = np.array([int(np.any(g[:, 0] == pos_id)) for g in gts])
-
+ 
     finetuned = YOLO(str(weights))
     ft_preds = predict(finetuned, test_imgs, {i: i for i in range(len(names))})
-
+ 
     coco = YOLO(BASE_MODEL)  # same architecture, COCO weights, zero-shot
     coco_map = {0: names.index("person")} if "person" in names else {}
     coco_preds = predict(coco, test_imgs, coco_map)
-
+ 
     nothing_preds = [np.zeros((0, 6)) for _ in test_imgs]
-
+ 
     # Frame-level scores. COCO has no 'head' class: its best available proxy is
     # "flag the frame if it sees a person", so its score is max person conf.
     person_id = coco_map.get(0, -1)
@@ -544,7 +556,7 @@ def main() -> None:
         "finetuned": ft_preds, "coco_zero_shot": coco_preds,
         "predict_nothing": nothing_preds, "majority_class": nothing_preds,
     }
-
+ 
     models = {}
     sweeps = {}
     for name in frame:
@@ -557,7 +569,7 @@ def main() -> None:
         }
     models["finetuned"]["class_confusion"] = class_confusion(ft_preds, gts, names)
     models["coco_zero_shot"]["class_confusion"] = class_confusion(coco_preds, gts, names)
-
+ 
     # Official Ultralytics numbers for the finetuned model, as a cross-check.
     try:
         v = finetuned.val(data=str(data_yaml), split="test", imgsz=IMGSZ, plots=True,
@@ -571,7 +583,7 @@ def main() -> None:
             shutil.copy(cm_png, ART_DIR / "ultralytics_confusion_matrix.png")
     except Exception as e:  # noqa: BLE001 - cross-check only
         print(f"Ultralytics val cross-check skipped: {e}")
-
+ 
     # 4. Costing on the finetuned model
     s, y = frame["finetuned"], labels
     chosen = models["finetuned"]["best_single"]
@@ -580,7 +592,7 @@ def main() -> None:
     alts = costing.alternatives()
     plot_cost_curve({k: sweeps[k] for k in ("finetuned", "coco_zero_shot")}, chosen, band_cap, alts,
                     ART_DIR / "cost_curve.png")
-
+ 
     # 5. Save
     with open(ART_DIR / "frame_scores.csv", "w", newline="") as f:
         w = csv.writer(f)
@@ -594,7 +606,7 @@ def main() -> None:
         for m, sw in sweeps.items():
             for r in sw:
                 w.writerow([m] + [round(r[k], 5) for k in keys])
-
+ 
     results = {
         "dataset_ref": {"workspace": WORKSPACE, "project": PROJECT, "version": VERSION,
                         "url": f"https://universe.roboflow.com/{WORKSPACE}/{PROJECT}/dataset/{VERSION}"},
@@ -611,7 +623,7 @@ def main() -> None:
     write_report_tables(results, ART_DIR / "report_tables.md")
     print((ART_DIR / "report_tables.md").read_text())
     print("Done. Commit weights/best.pt and artifacts/.")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
