@@ -1,0 +1,608 @@
+{
+  "dataset_ref": {
+    "workspace": "computer-vision-filqz",
+    "project": "hard-hat-detection-62rrp",
+    "version": 2,
+    "url": "https://universe.roboflow.com/computer-vision-filqz/hard-hat-detection-62rrp/dataset/2"
+  },
+  "names": [
+    "head",
+    "helmet",
+    "person"
+  ],
+  "positive_class": "head",
+  "dataset": {
+    "split_note": "no valid split shipped; every 7th train image (~15%) moved to valid",
+    "splits": {
+      "train": {
+        "images": 4516,
+        "images_without_boxes": 0,
+        "instances": {
+          "head": 4089,
+          "helmet": 12750,
+          "person": 423
+        },
+        "images_containing": {
+          "head": 831,
+          "helmet": 4144,
+          "person": 144
+        },
+        "object_size": {
+          "head": {
+            "median_pct_of_image": 0.597,
+            "p10_pct": 0.213,
+            "p90_pct": 2.09,
+            "share_tiny_lt_0.1pct": 0.007
+          },
+          "helmet": {
+            "median_pct_of_image": 0.835,
+            "p10_pct": 0.223,
+            "p90_pct": 4.821,
+            "share_tiny_lt_0.1pct": 0.01
+          },
+          "person": {
+            "median_pct_of_image": 8.458,
+            "p10_pct": 1.542,
+            "p90_pct": 33.964,
+            "share_tiny_lt_0.1pct": 0.0
+          }
+        }
+      },
+      "valid": {
+        "images": 753,
+        "images_without_boxes": 0,
+        "instances": {
+          "head": 785,
+          "helmet": 2134,
+          "person": 50
+        },
+        "images_containing": {
+          "head": 137,
+          "helmet": 688,
+          "person": 20
+        },
+        "object_size": {
+          "head": {
+            "median_pct_of_image": 0.623,
+            "p10_pct": 0.221,
+            "p90_pct": 1.919,
+            "share_tiny_lt_0.1pct": 0.005
+          },
+          "helmet": {
+            "median_pct_of_image": 0.823,
+            "p10_pct": 0.219,
+            "p90_pct": 4.777,
+            "share_tiny_lt_0.1pct": 0.008
+          },
+          "person": {
+            "median_pct_of_image": 5.515,
+            "p10_pct": 1.285,
+            "p90_pct": 30.238,
+            "share_tiny_lt_0.1pct": 0.0
+          }
+        }
+      },
+      "test": {
+        "images": 1766,
+        "images_without_boxes": 0,
+        "instances": {
+          "head": 1803,
+          "helmet": 4863,
+          "person": 142
+        },
+        "images_containing": {
+          "head": 339,
+          "helmet": 1604,
+          "person": 45
+        },
+        "object_size": {
+          "head": {
+            "median_pct_of_image": 0.603,
+            "p10_pct": 0.233,
+            "p90_pct": 1.808,
+            "share_tiny_lt_0.1pct": 0.004
+          },
+          "helmet": {
+            "median_pct_of_image": 0.821,
+            "p10_pct": 0.222,
+            "p90_pct": 4.956,
+            "share_tiny_lt_0.1pct": 0.014
+          },
+          "person": {
+            "median_pct_of_image": 6.498,
+            "p10_pct": 2.245,
+            "p90_pct": 28.429,
+            "share_tiny_lt_0.1pct": 0.0
+          }
+        }
+      }
+    },
+    "test_positive_frame_share": 0.192
+  },
+  "train_settings": {
+    "base_model": "yolo11s.pt",
+    "epochs": 40,
+    "imgsz": 640,
+    "batch": 16,
+    "patience": 10,
+    "seed": 0,
+    "optimizer": "auto (Ultralytics default)",
+    "note": "reused committed weights"
+  },
+  "models": {
+    "finetuned": {
+      "detection": {
+        "per_class": {
+          "head": {
+            "instances": 1803,
+            "AP50": 0.9704,
+            "AP50_95": 0.6999,
+            "precision": 0.9032,
+            "recall": 0.9573
+          },
+          "helmet": {
+            "instances": 4863,
+            "AP50": 0.981,
+            "AP50_95": 0.7099,
+            "precision": 0.9184,
+            "recall": 0.9632
+          },
+          "person": {
+            "instances": 142,
+            "AP50": 0.0258,
+            "AP50_95": 0.015,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        "overall": {
+          "mAP50": 0.6591,
+          "mAP50_95": 0.4749
+        },
+        "box_conf_for_P_R": 0.25
+      },
+      "frame_auc": 0.9812631652930318,
+      "best_single": {
+        "pos_alert": 0.9557522123893806,
+        "pos_review": 0.0,
+        "pos_pass": 0.04424778761061947,
+        "pos_n": 339,
+        "neg_alert": 0.04484933426769446,
+        "neg_review": 0.0,
+        "neg_pass": 0.9551506657323056,
+        "neg_n": 1427,
+        "cost_per_frame": 1.0098169933829868,
+        "cost_per_1000": 1009.8169933829868,
+        "cost_per_day": 3029.4509801489603,
+        "review_share": 0.0,
+        "reviews_per_day": 0.0,
+        "review_hours_per_day": 0.0,
+        "reviewers_needed": 0.0,
+        "missed_violations_per_day": 6.6371681415929205,
+        "false_alerts_per_day": 127.8206026629292,
+        "t_low": 0.08,
+        "t_high": 0.08
+      },
+      "class_confusion": {
+        "rows_true": [
+          "head",
+          "helmet",
+          "person",
+          "background"
+        ],
+        "cols_pred": [
+          "head",
+          "helmet",
+          "person",
+          "missed"
+        ],
+        "matrix": [
+          [
+            1722,
+            21,
+            0,
+            60
+          ],
+          [
+            13,
+            4683,
+            0,
+            167
+          ],
+          [
+            0,
+            0,
+            0,
+            142
+          ],
+          [
+            176,
+            396,
+            0,
+            0
+          ]
+        ]
+      },
+      "ultralytics_test": {
+        "mAP50": 0.6599,
+        "mAP50_95": 0.4574,
+        "per_class_AP50": {
+          "head": 0.9714,
+          "helmet": 0.9825,
+          "person": 0.0259
+        }
+      }
+    },
+    "coco_zero_shot": {
+      "detection": {
+        "per_class": {
+          "head": {
+            "instances": 1803,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "helmet": {
+            "instances": 4863,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "person": {
+            "instances": 142,
+            "AP50": 0.0256,
+            "AP50_95": 0.0172,
+            "precision": 0.019,
+            "recall": 0.8944
+          }
+        },
+        "overall": {
+          "mAP50": 0.0085,
+          "mAP50_95": 0.0057
+        },
+        "box_conf_for_P_R": 0.25
+      },
+      "frame_auc": 0.6755555004310051,
+      "best_single": {
+        "pos_alert": 0.8348082595870207,
+        "pos_review": 0.0,
+        "pos_pass": 0.16519174041297935,
+        "pos_n": 339,
+        "neg_alert": 0.5480028030833918,
+        "neg_review": 0.0,
+        "neg_pass": 0.4519971969166083,
+        "neg_n": 1427,
+        "cost_per_frame": 5.456511122411644,
+        "cost_per_1000": 5456.5111224116445,
+        "cost_per_day": 16369.533367234933,
+        "review_share": 0.0,
+        "reviews_per_day": 0.0,
+        "review_hours_per_day": 0.0,
+        "reviewers_needed": 0.0,
+        "missed_violations_per_day": 24.778761061946902,
+        "false_alerts_per_day": 1561.8079887876665,
+        "t_low": 0.85,
+        "t_high": 0.85
+      },
+      "class_confusion": {
+        "rows_true": [
+          "head",
+          "helmet",
+          "person",
+          "background"
+        ],
+        "cols_pred": [
+          "head",
+          "helmet",
+          "person",
+          "missed"
+        ],
+        "matrix": [
+          [
+            0,
+            0,
+            45,
+            1758
+          ],
+          [
+            0,
+            0,
+            78,
+            4785
+          ],
+          [
+            0,
+            0,
+            126,
+            16
+          ],
+          [
+            0,
+            0,
+            6427,
+            0
+          ]
+        ]
+      }
+    },
+    "predict_nothing": {
+      "detection": {
+        "per_class": {
+          "head": {
+            "instances": 1803,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "helmet": {
+            "instances": 4863,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "person": {
+            "instances": 142,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        "overall": {
+          "mAP50": 0.0,
+          "mAP50_95": 0.0
+        },
+        "box_conf_for_P_R": 0.25
+      },
+      "frame_auc": 0.5,
+      "best_single": {
+        "pos_alert": 1.0,
+        "pos_review": 0.0,
+        "pos_pass": 0.0,
+        "pos_n": 339,
+        "neg_alert": 1.0,
+        "neg_review": 0.0,
+        "neg_pass": 0.0,
+        "neg_n": 1427,
+        "cost_per_frame": 7.5,
+        "cost_per_1000": 7500.0,
+        "cost_per_day": 22500.0,
+        "review_share": 0.0,
+        "reviews_per_day": 0.0,
+        "review_hours_per_day": 0.0,
+        "reviewers_needed": 0.0,
+        "missed_violations_per_day": 0.0,
+        "false_alerts_per_day": 2850.0,
+        "t_low": 0.0,
+        "t_high": 0.0
+      }
+    },
+    "majority_class": {
+      "detection": {
+        "per_class": {
+          "head": {
+            "instances": 1803,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "helmet": {
+            "instances": 4863,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          },
+          "person": {
+            "instances": 142,
+            "AP50": 0.0,
+            "AP50_95": 0.0,
+            "precision": 0.0,
+            "recall": 0.0
+          }
+        },
+        "overall": {
+          "mAP50": 0.0,
+          "mAP50_95": 0.0
+        },
+        "box_conf_for_P_R": 0.25
+      },
+      "frame_auc": 0.5,
+      "best_single": {
+        "pos_alert": 1.0,
+        "pos_review": 0.0,
+        "pos_pass": 0.0,
+        "pos_n": 339,
+        "neg_alert": 1.0,
+        "neg_review": 0.0,
+        "neg_pass": 0.0,
+        "neg_n": 1427,
+        "cost_per_frame": 7.5,
+        "cost_per_1000": 7500.0,
+        "cost_per_day": 22500.0,
+        "review_share": 0.0,
+        "reviews_per_day": 0.0,
+        "review_hours_per_day": 0.0,
+        "reviewers_needed": 0.0,
+        "missed_violations_per_day": 0.0,
+        "false_alerts_per_day": 2850.0,
+        "t_low": 0.0,
+        "t_high": 0.0
+      }
+    }
+  },
+  "chosen_single": {
+    "pos_alert": 0.9557522123893806,
+    "pos_review": 0.0,
+    "pos_pass": 0.04424778761061947,
+    "pos_n": 339,
+    "neg_alert": 0.04484933426769446,
+    "neg_review": 0.0,
+    "neg_pass": 0.9551506657323056,
+    "neg_n": 1427,
+    "cost_per_frame": 1.0098169933829868,
+    "cost_per_1000": 1009.8169933829868,
+    "cost_per_day": 3029.4509801489603,
+    "review_share": 0.0,
+    "reviews_per_day": 0.0,
+    "review_hours_per_day": 0.0,
+    "reviewers_needed": 0.0,
+    "missed_violations_per_day": 6.6371681415929205,
+    "false_alerts_per_day": 127.8206026629292,
+    "t_low": 0.08,
+    "t_high": 0.08
+  },
+  "band_unconstrained": {
+    "pos_alert": 0.3008849557522124,
+    "pos_review": 0.6991150442477876,
+    "pos_pass": 0.0,
+    "pos_n": 339,
+    "neg_alert": 0.0,
+    "neg_review": 1.0,
+    "neg_pass": 0.0,
+    "neg_n": 1427,
+    "cost_per_frame": 0.5391592920353983,
+    "cost_per_1000": 539.1592920353983,
+    "cost_per_day": 1617.4778761061948,
+    "review_share": 0.9849557522123893,
+    "reviews_per_day": 2954.867256637168,
+    "review_hours_per_day": 16.41592920353982,
+    "reviewers_needed": 2.525527569775357,
+    "missed_violations_per_day": 0.0,
+    "false_alerts_per_day": 0.0,
+    "t_low": 0.0,
+    "t_high": 0.86
+  },
+  "band_chosen": {
+    "pos_alert": 0.3008849557522124,
+    "pos_review": 0.6755162241887905,
+    "pos_pass": 0.02359882005899705,
+    "pos_n": 339,
+    "neg_alert": 0.0,
+    "neg_review": 0.11632796075683252,
+    "neg_pass": 0.8836720392431675,
+    "neg_n": 1427,
+    "cost_per_frame": 0.5671894885750924,
+    "cost_per_1000": 567.1894885750925,
+    "cost_per_day": 1701.5684657252773,
+    "review_share": 0.1442873739284304,
+    "reviews_per_day": 432.86212178529127,
+    "review_hours_per_day": 2.4047895654738407,
+    "reviewers_needed": 0.36996762545751394,
+    "missed_violations_per_day": 3.5398230088495577,
+    "false_alerts_per_day": 0.0,
+    "t_low": 0.01,
+    "t_high": 0.86
+  },
+  "alternatives": {
+    "do_nothing": {
+      "cost_per_1000": 7500.0,
+      "cost_per_day": 22500.0,
+      "reviewers_needed": 0.0
+    },
+    "human_checks_everything": {
+      "cost_per_1000": 541.6666666666666,
+      "cost_per_day": 1625.0,
+      "reviewers_needed": 2.5641025641025643
+    }
+  },
+  "assumptions": {
+    "cost_fn": 150.0,
+    "cost_fp": 7.5,
+    "cost_tp": 7.5,
+    "cost_tn": 0.0,
+    "cost_review": 0.16666666666666666,
+    "base_rate": 0.05,
+    "frames_per_day": 3000,
+    "review_seconds": 20.0,
+    "reviewer_productive_hours": 6.5,
+    "reviewers_available": 1
+  },
+  "sensitivity": {
+    "cost_fn": [
+      {
+        "cost_fn": 25,
+        "best_threshold": 0.54,
+        "model_alone_per_1000": 567.9,
+        "do_nothing_per_1000": 1250.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 50,
+        "best_threshold": 0.31,
+        "model_alone_per_1000": 685.2,
+        "do_nothing_per_1000": 2500.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 100,
+        "best_threshold": 0.31,
+        "model_alone_per_1000": 862.2,
+        "do_nothing_per_1000": 5000.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 150,
+        "best_threshold": 0.08,
+        "model_alone_per_1000": 1009.8,
+        "do_nothing_per_1000": 7500.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 300,
+        "best_threshold": 0.03,
+        "model_alone_per_1000": 1277.6,
+        "do_nothing_per_1000": 15000.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 600,
+        "best_threshold": 0.03,
+        "model_alone_per_1000": 1675.8,
+        "do_nothing_per_1000": 30000.0,
+        "human_all_per_1000": 541.7
+      },
+      {
+        "cost_fn": 1000,
+        "best_threshold": 0.03,
+        "model_alone_per_1000": 2206.8,
+        "do_nothing_per_1000": 50000.0,
+        "human_all_per_1000": 541.7
+      }
+    ],
+    "base_rate": [
+      {
+        "base_rate": 0.01,
+        "best_threshold": 0.5,
+        "model_alone_per_1000": 328.2
+      },
+      {
+        "base_rate": 0.02,
+        "best_threshold": 0.31,
+        "model_alone_per_1000": 516.6
+      },
+      {
+        "base_rate": 0.05,
+        "best_threshold": 0.08,
+        "model_alone_per_1000": 1009.8
+      },
+      {
+        "base_rate": 0.1,
+        "best_threshold": 0.03,
+        "model_alone_per_1000": 1615.5
+      },
+      {
+        "base_rate": 0.2,
+        "best_threshold": 0.03,
+        "model_alone_per_1000": 2689.7
+      }
+    ]
+  },
+  "test_frames": 1766,
+  "test_positive_frames": 339
+}
