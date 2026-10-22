@@ -1,4 +1,3 @@
-
 """
 Assignment 2: training pipeline (hard-hat compliance on construction sites).
  
@@ -251,20 +250,27 @@ def finetune(data_yaml: Path) -> tuple[Path, dict]:
 def predict(model, imgs: list[Path], class_map: dict[int, int]) -> list[np.ndarray]:
     """Predictions per image as [cls, conf, x1, y1, x2, y2] (normalised),
     with model classes mapped to dataset classes. Unmapped classes dropped."""
+    import gc
+ 
     out = []
-    for r in model.predict(source=[str(p) for p in imgs], conf=0.001, imgsz=IMGSZ,
-                           stream=True, verbose=False, max_det=300):
-        b = r.boxes
-        if b is None or len(b) == 0:
-            out.append(np.zeros((0, 6)))
-            continue
-        cls = b.cls.cpu().numpy().astype(int)
-        conf = b.conf.cpu().numpy()
-        xyxy = b.xyxyn.cpu().numpy()
-        keep = np.array([c in class_map for c in cls], dtype=bool)
-        mapped = np.array([class_map.get(c, -1) for c in cls])
-        arr = np.column_stack([mapped, conf, xyxy])[keep]
-        out.append(arr.reshape(-1, 6))
+    chunk = 16  # small chunks keep RAM flat; one big list ran Colab out of memory
+    for start in range(0, len(imgs), chunk):
+        batch = [str(p) for p in imgs[start:start + chunk]]
+        for r in model.predict(source=batch, conf=0.01, imgsz=IMGSZ, verbose=False, max_det=100):
+            b = r.boxes
+            if b is None or len(b) == 0:
+                out.append(np.zeros((0, 6), dtype=np.float32))
+                continue
+            cls = b.cls.cpu().numpy().astype(int)
+            conf = b.conf.cpu().numpy()
+            xyxy = b.xyxyn.cpu().numpy()
+            keep = np.array([c in class_map for c in cls], dtype=bool)
+            mapped = np.array([class_map.get(c, -1) for c in cls])
+            arr = np.column_stack([mapped, conf, xyxy])[keep].astype(np.float32)
+            out.append(arr.reshape(-1, 6))
+        gc.collect()
+        if start % 320 == 0:
+            print(f"  predicted {min(start + chunk, len(imgs))}/{len(imgs)} images", flush=True)
     return out
  
  
@@ -533,12 +539,21 @@ def main() -> None:
     gts = [read_labels(p) for p in test_imgs]
     labels = np.array([int(np.any(g[:, 0] == pos_id)) for g in gts])
  
+    import gc
+ 
+    print(f"\n[eval] finetuned model on {len(test_imgs)} test images", flush=True)
     finetuned = YOLO(str(weights))
     ft_preds = predict(finetuned, test_imgs, {i: i for i in range(len(names))})
+    del finetuned
+    gc.collect()
  
+    print("[eval] COCO zero-shot baseline", flush=True)
     coco = YOLO(BASE_MODEL)  # same architecture, COCO weights, zero-shot
     coco_map = {0: names.index("person")} if "person" in names else {}
     coco_preds = predict(coco, test_imgs, coco_map)
+    del coco
+    gc.collect()
+    print("[eval] computing metrics and costs", flush=True)
  
     nothing_preds = [np.zeros((0, 6)) for _ in test_imgs]
  
@@ -569,20 +584,6 @@ def main() -> None:
         }
     models["finetuned"]["class_confusion"] = class_confusion(ft_preds, gts, names)
     models["coco_zero_shot"]["class_confusion"] = class_confusion(coco_preds, gts, names)
- 
-    # Official Ultralytics numbers for the finetuned model, as a cross-check.
-    try:
-        v = finetuned.val(data=str(data_yaml), split="test", imgsz=IMGSZ, plots=True,
-                          project=str(RUNS_DIR), name="test_eval", exist_ok=True, verbose=False)
-        models["finetuned"]["ultralytics_test"] = {
-            "mAP50": round(float(v.box.map50), 4), "mAP50_95": round(float(v.box.map), 4),
-            "per_class_AP50": {names[i]: round(float(x), 4) for i, x in zip(v.box.ap_class_index, v.box.ap50)},
-        }
-        cm_png = Path(v.save_dir) / "confusion_matrix.png"
-        if cm_png.exists():
-            shutil.copy(cm_png, ART_DIR / "ultralytics_confusion_matrix.png")
-    except Exception as e:  # noqa: BLE001 - cross-check only
-        print(f"Ultralytics val cross-check skipped: {e}")
  
     # 4. Costing on the finetuned model
     s, y = frame["finetuned"], labels
@@ -621,8 +622,28 @@ def main() -> None:
     with open(ART_DIR / "results.json", "w") as f:
         json.dump(results, f, indent=2, default=float)
     write_report_tables(results, ART_DIR / "report_tables.md")
-    print((ART_DIR / "report_tables.md").read_text())
-    print("Done. Commit weights/best.pt and artifacts/.")
+    print((ART_DIR / "report_tables.md").read_text(), flush=True)
+ 
+    # Official Ultralytics numbers as a cross-check. Runs last, with few
+    # workers, so that if it fails or runs out of memory, everything the app
+    # needs is already saved.
+    try:
+        print("[eval] Ultralytics val cross-check", flush=True)
+        v = YOLO(str(weights)).val(data=str(data_yaml), split="test", imgsz=IMGSZ, batch=8, workers=2,
+                                   plots=True, project=str(RUNS_DIR), name="test_eval", exist_ok=True,
+                                   verbose=False)
+        results["models"]["finetuned"]["ultralytics_test"] = {
+            "mAP50": round(float(v.box.map50), 4), "mAP50_95": round(float(v.box.map), 4),
+            "per_class_AP50": {names[i]: round(float(x), 4) for i, x in zip(v.box.ap_class_index, v.box.ap50)},
+        }
+        with open(ART_DIR / "results.json", "w") as f:
+            json.dump(results, f, indent=2, default=float)
+        cm_png = Path(v.save_dir) / "confusion_matrix.png"
+        if cm_png.exists():
+            shutil.copy(cm_png, ART_DIR / "ultralytics_confusion_matrix.png")
+    except Exception as e:  # noqa: BLE001 - cross-check only
+        print(f"Ultralytics val cross-check skipped: {e}")
+    print("Done. Commit weights/best.pt and artifacts/.", flush=True)
  
  
 if __name__ == "__main__":
